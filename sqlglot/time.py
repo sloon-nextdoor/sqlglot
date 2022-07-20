@@ -19,7 +19,8 @@ def format_time(string, mapping, trie=None):
 
     while end <= size:
         chars = string[start:end]
-        result = in_trie(trie, chars)
+        # TODO
+        result, _ = in_trie(trie, chars)
 
         if result == 0:
             if sym:

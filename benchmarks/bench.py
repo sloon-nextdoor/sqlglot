@@ -193,9 +193,9 @@ def diff(row, column):
 libs = [
     "sqlglot",
     "sqltree",
-    "sqlparse",
-    "moz_sql_parser",
-    "sqloxide",
+    #"sqlparse",
+    #"moz_sql_parser",
+    #"sqloxide",
 ]
 table = []
 

@@ -242,13 +242,11 @@ class _Tokenizer(type):
 
         klass.AMBIGUOUS = new_trie(
             key.upper()
-            for key, value in {
-                **klass.KEYWORDS,
-                **{quote: TokenType.QUOTE for quote in klass.QUOTES},
-            }.items()
-            if value in (TokenType.COMMENT, TokenType.COMMENT_START, TokenType.QUOTE)
-            or " " in key
-            or any(single in key for single in klass.SINGLE_TOKENS)
+            for key in [
+                *klass.KEYWORDS,
+                *klass.QUOTES,
+                *klass.SINGLE_TOKENS
+            ]
         )
 
         return klass
@@ -560,12 +558,10 @@ class Tokenizer(metaclass=_Tokenizer):
                 self._scan_identifier()
             elif self._char == "#":
                 self._scan_annotation()
-            elif self._scan_ambiguous():
-                pass
-            elif self._char in self.SINGLE_TOKENS:
-                self._add(self.SINGLE_TOKENS[self._char])
             else:
-                self._scan_var()
+                self._scan_ambiguous()
+        #for token in self.tokens:
+        #    print(token)
         return self.tokens
 
     def _chars(self, size):
@@ -602,32 +598,52 @@ class Tokenizer(metaclass=_Tokenizer):
                 self._add(TokenType.STRING)
 
     def _scan_ambiguous(self):
-        size = 1
         word = None
-        chars = self._text
+        size = 0
+        trie = self.AMBIGUOUS
 
-        while chars:
-            result = in_trie(self.AMBIGUOUS, chars.upper())
+        while True:
+            result, trie = in_trie(trie, self._char.upper())
 
-            if result == 0:
+            if result == 1:
+                if self._char.strip():
+                    word = None
+            elif result == 2:
+                word = self._text
+            elif result == 0:
+                if (
+                        word
+                        and word[0] not in self.SINGLE_TOKENS
+                        and word not in self.QUOTES
+                        and self._char.strip()
+                        and self._char not in self.SINGLE_TOKENS
+                        and " " not in self._text
+                ):
+                    word = None
                 break
-            if result == 2:
-                word = chars
+            if self._end:
+                break
+            self._advance()
             size += 1
-            chars = self._chars(size)
 
-        if not word:
-            return False
+        if result != 2:
+            self._advance(len(word) - len(self._text) if word else -1)
 
-        if self._scan_comment(word):
-            return True
+        if word:
+            if self._scan_comment(word):
+                return
 
-        if self._scan_string(word):
-            return True
+            keyword = self.SINGLE_TOKENS.get(word) or self.KEYWORDS.get(word.upper())
 
-        self._advance(len(word) - 1)
-        self._add(self.KEYWORDS[word.upper()])
-        return True
+            if keyword:
+                self._add(keyword)
+                return
+
+            if self._scan_string(word):
+                return
+
+
+        self._scan_var()
 
     def _scan_comment(self, comment):
         if comment in self.COMMENTS:
@@ -688,7 +704,7 @@ class Tokenizer(metaclass=_Tokenizer):
 
         size = len(quote)
         text = ""
-        self._advance(size)
+        self._advance()
 
         if quote.startswith("r"):
             quote = quote[1:]
@@ -737,4 +753,4 @@ class Tokenizer(metaclass=_Tokenizer):
                 self._advance()
             else:
                 break
-        self._add(self.KEYWORDS.get(self._text.upper(), TokenType.VAR))
+        self._add(TokenType.VAR)
